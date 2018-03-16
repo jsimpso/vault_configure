@@ -11,4 +11,5 @@ class BuildTests(unittest.TestCase):
 
     def test_client_is_authenticated(self):
         self.assertTrue(self.client.is_authenticated())
+        self.client.close()
 
