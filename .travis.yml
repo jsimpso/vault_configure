@@ -1,0 +1,18 @@
+sudo: required
+
+language: python
+python:
+  - "3.6"
+
+services:
+  - docker
+
+before_install:
+  - docker pull vault
+  - docker run --cap-add=IPC_LOCK --name dev-vault -e 'VAULT_DEV_ROOT_TOKEN_ID=myroot' -d -p 8200:8200 vault
+
+install:
+  - pip install hvac
+
+script:
+  - python -m unittest tests/build.py

@@ -1,0 +1,8 @@
+{
+  "path": "Example Audit",
+  "type": "file",
+  "description": "example description",
+  "options": {
+    "file_path": "/vault/logs/example.log" }
+}
+
