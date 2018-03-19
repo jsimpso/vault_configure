@@ -15,7 +15,7 @@ class BuildTests(unittest.TestCase):
         self.client.close()
 
     def test_bad_audit_is_removed(self):
-        vault_configure.execute()
+        vault_configure.applicator.execute()
         self.assertTrue('file/' not in self.client.list_audit_backends())
 
 
