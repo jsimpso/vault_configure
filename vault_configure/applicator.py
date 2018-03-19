@@ -1,65 +1,67 @@
 #!/usr/bin/env python
 
-import hvac
-import json
 import os
 import glob
+import audit
 
 
-def error_check(config_dict):
-    if 'type' not in config_dict:
-        raise ValueError("Audit type not specified")
-    if config_dict['type'] not in ['file', 'socket', 'syslog']:
-        raise ValueError("Incorrect value for audit backend type.")
+def execute():
+    # data_dir is the absolute path of the "data" directory from the project root
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data'))
+
+    # use glob to search recursively through the data directory and return the absolute path of any JSON format files
+    # NOTE: This functionality is only available from Python 3.5 onwards (https://docs.python.org/3/library/glob.html)
+    results = glob.glob(data_dir + '/**/*.json', recursive=True)
+
+    # if len(results) == 0:
+    #     print("Nothing to do!")
+    #     exit(0)
+
+    audit_files = []
+    # Always create before destroying
+    for file in results:
+        if 'sys/audit' in file:
+            audit_files.append(file)
+            print("Running check for audit file: {}".format(file))
+            my_audit = audit.Audit(file)
+            print("Authorisation: {}".format(my_audit.is_authorised()))
+            if not my_audit.is_authorised():
+                raise ValueError("The provided Vault token does not have sufficient access to perform this task.")
+
+            if not my_audit.verify():
+                print("Check failed - config application required.")
+                my_audit.enable()
+            else:
+                print("Check passed - no action required.")
 
 
-def enable_audit(config_file):
-    with open(config_file, 'r') as openfile:
-        config = json.loads(openfile.read())
-    error_check(config)
-    try:
-        name = config['path']
-    except KeyError:
-        name = None
-    try:
-        description = config['description']
-    except KeyError:
-        description = None
-    try:
-        options = config['options']
-    except KeyError:
-        options = None
-    client = hvac.Client(url='http://localhost:8200', token='myroot')
-    client.enable_audit_backend(config['type'], description, options, name)
+    # Check for items to be destroyed.
 
-
-def check_audit(config_file):
-    with open(config_file, 'r') as openfile:
-        config = json.loads(openfile.read())
-    error_check(config)
+    # POC to be modularised and *heavily* re-written to not break everything
+    import hvac
+    import json
     client = hvac.Client(url='http://localhost:8200', token='myroot')
     audits = client.list_audit_backends()
-    if config['path']+'/' not in audits:
-        return False
+    paths = []
+    for file in audit_files:
+        with open(file, 'r') as openfile:
+            temp_conf = json.loads(openfile.read())
+        paths.append(temp_conf['path']+'/')
+
+    removals = [path for path in audits if path not in paths and path.endswith('/')]
+
+    print("Paths: {}".format(paths))
+    print("Removals: {}".format(removals))
+    if len(removals) > 0:
+        print("Caught some removals!")
+        for removal in removals:
+            my_audit = audit.Audit({'name': removal})
+        my_audit.destroy()
     else:
-        audit = audits[config['path']+'/']
-        audit = {k: v for k, v in audit.items() if k in config}
-        return {k: v for k, v in audit.items() if k != 'path'} == {k: v for k, v in config.items() if k != 'path'}
+        print("No removals found!")
 
 
 if __name__ == '__main__':
-    data_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data'))
-    results = glob.glob(data_dir + '/**/*.json', recursive=True)
+    execute()
 
-    if len(results) == 0:
-        print("Nothing to do!")
-        exit(0)
 
-    for file in results:
-        if 'sys/audit' in file:
-            print("Running check for audit file: {}".format(file))
-            if not check_audit(file):
-                print("Check failed - config application required.")
-                enable_audit(file)
-            else:
-                print("Check passed - no action required.")
