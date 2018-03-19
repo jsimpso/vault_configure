@@ -2,7 +2,7 @@
 
 import os
 import glob
-import audit
+from . import audit
 
 
 def execute():
