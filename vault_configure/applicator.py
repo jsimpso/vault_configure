@@ -18,26 +18,11 @@ def execute():
     #     exit(0)
 
     audit_files = []
-    # Always create before destroying
     for file in results:
         if 'sys/audit' in file:
             audit_files.append(file)
-            print("Running check for audit file: {}".format(file))
-            my_audit = audit.Audit(file)
-            print("Authorisation: {}".format(my_audit.is_authorised()))
-            if not my_audit.is_authorised():
-                raise ValueError("The provided Vault token does not have sufficient access to perform this task.")
-
-            if not my_audit.verify():
-                print("Check failed - config application required.")
-                my_audit.enable()
-            else:
-                print("Check passed - no action required.")
-
-
-    # Check for items to be destroyed.
-
     # POC to be modularised and *heavily* re-written to not break everything
+    # Trial - destroy before creating
     import hvac
     import json
     client = hvac.Client(url='http://localhost:8200', token='myroot')
@@ -59,6 +44,26 @@ def execute():
         my_audit.destroy()
     else:
         print("No removals found!")
+
+
+
+    # Always create before destroying?
+    for file in audit_files:
+        print("Running check for audit file: {}".format(file))
+        my_audit = audit.Audit(file)
+        print("Authorisation: {}".format(my_audit.is_authorised()))
+        if not my_audit.is_authorised():
+            raise ValueError("The provided Vault token does not have sufficient access to perform this task.")
+
+        if not my_audit.verify():
+            print("Check failed - config application required.")
+            my_audit.enable()
+        else:
+            print("Check passed - no action required.")
+
+
+    # Check for items to be destroyed.
+
 
 
 if __name__ == '__main__':
